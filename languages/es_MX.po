@@ -1,0 +1,85 @@
+# Este archivo es la traducción en español del plugin eSIM Plans Widget
+
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: es_ES\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "eSIM Plans Widget"
+msgstr "Widget de Planes eSIM"
+
+msgid "A widget to search and display eSIM plans based on country."
+msgstr "Un widget para buscar y mostrar planes eSIM según el país."
+
+msgid "Version"
+msgstr "Versión"
+
+msgid "Your Name"
+msgstr "Tu Nombre"
+
+msgid "Buscar País"
+msgstr "Buscar País"
+
+msgid "Buscar Planes"
+msgstr "Buscar Planes"
+
+msgid "Mejores Planes"
+msgstr "Mejores Planes"
+
+msgid "Cargando..."
+msgstr "Cargando..."
+
+msgid "No se encontraron planes."
+msgstr "No se encontraron planes."
+
+msgid "GB"
+msgstr "GB"
+
+msgid "Días"
+msgstr "Días"
+
+msgid "Conectividad"
+msgstr "Conectividad"
+
+msgid "Datos"
+msgstr "Datos"
+
+msgid "Precio"
+msgstr "Precio"
+
+msgid "Moneda"
+msgstr "Moneda"
+
+msgid "Bandera de"
+msgstr "Bandera de"
+
+msgid "Comprar"
+msgstr "Comprar"
+
+msgid "Plan Regional"
+msgstr "Plan Regional"
+
+msgid "Código de país seleccionado: "
+msgstr "Código de país seleccionado: "
+
+msgid "Por favor, ingresa un país válido."
+msgstr "Por favor, ingresa un país válido."
+
+msgid "No plans found."
+msgstr "No se encontraron planes."
+
+msgid "Loading..."
+msgstr "Cargando..."
+
+msgid "Search Country"
+msgstr "Buscar País"
+
+msgid "Search Plans"
+msgstr "Buscar Planes"
+
+msgid "Best Plans"
+msgstr "Mejores Planes"
+
+msgid "Country code"
+msgstr "Código de país"

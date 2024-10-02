@@ -1,0 +1,300 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Open Sans', sans-serif; /* Tipografía oficial */
+}
+
+.mk-widget-container {
+    width: 100%;
+    max-width: 1366px;
+    margin: auto;
+    padding: 20px;
+    border-radius: 15px; /* Bordes redondeados */
+    background: transparent; /* Sin fondo en el contenedor del widget */
+}
+
+.mk-widget-header {
+    display: flex;
+    align-items: center; /* Alinear elementos verticalmente */
+    justify-content: center; /* Centrar elementos */
+    margin-bottom: 20px;
+}
+
+.mk-input-container {
+    position: relative;
+    width: 100%; /* Ocupa el 100% del ancho */
+    max-width: 900px; /* Aumentar tamaño máximo en escritorio */
+    min-width: 600px;
+}
+
+/* Ajustes para el input de búsqueda */
+#mk-destination {
+    width: 100%; /* 100% de ancho en móviles */
+    padding: 12px 40px 12px 50px; /* Espaciado ajustado para el icono */
+    border: 1px solid #ddd;
+    border-radius: 25px; /* Bordes más redondeados */
+    font-size: 20px; /* Aumentar el tamaño de la fuente */
+    background-color: #ffffff; /* Fondo blanco para mayor claridad */
+    transition: border 0.3s; /* Transición suave para el borde */
+}
+
+.mk-location-icon {
+    position: absolute;
+    left: 15px; /* Espaciado ajustado */
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    color: #333;
+}
+
+#mk-destination:focus {
+    border-color: #078ee7; /* Cambio de color en el foco */
+    outline: none; /* Eliminar contorno */
+}
+
+.mk-search-button {
+    padding: 20px 25px;
+    background-color: #078ee7; /* Color de fondo del botón */
+    color: white;
+    border: none;
+    border-radius: 25px; /* Bordes más redondeados */
+    cursor: pointer;
+    font-size: 16px;
+    margin-left: 20px; /* Espacio entre la barra de búsqueda y el botón */
+    transition: background-color 0.3s; /* Transición suave */
+}
+
+.mk-search-button:hover {
+    background-color: #0579d3; /* Color al pasar el mouse */
+}
+
+.mk-plans {
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* Espacio entre los planes */
+}
+
+.mk-plan {
+    display: grid;
+   grid-template-columns: 2fr 1fr 1fr 1fr;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    transition: transform 0.3s;
+    gap: 10px;
+     position: relative; /* Para posicionar el tooltip */
+}
+
+    /* Estilo para el tooltip */
+.mk-plan[title]:hover::after {
+    content: attr(title); /* Mostrar el contenido del atributo title */
+    position: absolute;
+    bottom: 100%; /* Posicionar por encima del plan */
+    left: 50%;
+    transform: translateX(-50%); /* Centrar el tooltip */
+    background-color: #007bff; /* Fondo azul */
+    color: white; /* Texto blanco */
+    padding: 5px 10px; /* Espaciado interno */
+    border-radius: 5px; /* Bordes redondeados */
+    white-space: nowrap; /* Evitar que el texto se divida en varias líneas */
+    z-index: 10; /* Asegurarse de que esté encima de otros elementos */
+    opacity: 0; /* Comenzar invisible */
+    transition: opacity 0.3s; /* Transición suave */
+}
+
+.mk-plan:hover::after {
+    opacity: 1; /* Mostrar en hover */
+}
+
+.mk-plan:hover {
+    transform: translateY(-2px); /* Efecto de elevación al pasar el mouse */
+}
+
+.mk-network {
+    display: block;
+    align-items: center;
+}
+
+.mk-flag {
+    width: 25px;
+    height: 20px;
+    margin-right: 10px; /* Espaciado entre la bandera y el nombre */
+}
+
+.mk-connectivity-icon {
+    width: 25px; /* Ajustar tamaño del icono de conectividad */
+    margin-left: 10px; /* Espaciado entre el nombre y el icono */
+}
+
+.mk-datos {
+    display: block;
+    margin: 0 15px; /* Espaciado horizontal */
+}
+
+.mk-data, .mk-validity {
+    font-size: 1em; /* Tamaño de fuente más pequeño para datos */
+    color: #555; /* Color de texto suave */
+}
+
+.mk-precio {
+    display: block;
+    font-size: 18px;
+    color: #008ee0/* Color del precio */
+    font-weight: bold;
+}
+
+.mk-boton {
+    margin-left: auto; /* Alinear a la derecha */
+}
+
+.mk-activate-button {
+    padding: 10px 20px;
+    background-color: #078ee7; /* Color de fondo del botón */
+    color: white;
+    border: none;
+    border-radius: 25px; /* Bordes más redondeados */
+    cursor: pointer;
+    transition: background-color 0.3s; /* Transición suave */
+}
+
+.mk-activate-button:hover {
+    background-color: #0579d3; /* Color al pasar el mouse */
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+    .mk-widget-header {
+        flex-direction: column; /* Mantener la dirección en columna en móviles */
+    }
+
+    .mk-input-container {
+    position: relative;
+    width: 100%; /* Ocupa el 100% del ancho */
+        }
+
+
+    #mk-destination {
+        margin-bottom: 10px; /* Espacio entre barra de búsqueda y botón */
+    }
+
+    .mk-search-button {
+        width: 100%; /* Botón ocupa el 100% del ancho */
+    }
+
+    .mk-plan {
+       
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        align-items: center;
+        justify-items: center;
+        grid-template-rows: 1fr 1fr 1fr; 
+        padding: 10px 10px 25px 10px;
+        gap: 25px 0px;
+        grid-template-areas: 
+   
+    "Title Title"
+    "Data Price"
+    "Button Button"; 
+    }
+
+    .mk-network {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-area: Title;
+        gap: 0px 15px;
+        align-items: center;
+        justify-content: center;
+    }
+    .mk-datos {
+        grid-area: Data; 
+     }    
+    .mk-precio {
+        grid-area: Price;
+    }
+    .mk-boton {
+        grid-area: Button;
+        margin: auto;
+    }
+
+    .mk-data, .mk-validity {
+    font-size: 1.3em;
+    margin-left: 5px;
+    }
+
+    .mk-activate-button {
+            padding: 10px 45px;
+            font-size: 19px;
+    }
+
+    .mk-plans {
+    display: flex;
+    flex-direction: column;
+    gap: 30px; /* Espacio entre los planes */
+    }
+
+    mk-destination{
+        
+    }
+}
+
+/* Estilos para el contenedor de autocompletado */
+.ui-autocomplete {
+    max-height: 200px; /* Altura máxima del menú desplegable */
+    overflow-y: auto; /* Habilitar scroll si hay muchas sugerencias */
+    border: 1px solid #ddd; /* Borde del menú */
+    border-radius: 8px; /* Bordes redondeados */
+    background-color: #fff; /* Fondo blanco */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Sombra suave */
+    z-index: 1000; /* Asegúrate de que esté por encima de otros elementos */
+}
+
+/* Estilos para cada ítem de autocompletado */
+.ui-menu-item {
+    padding: 10px 15px; /* Espaciado interno */
+    cursor: pointer; /* Cambiar el cursor al pasar sobre el ítem */
+}
+
+/* Estilo cuando se pasa el mouse sobre un ítem */
+.ui-menu-item:hover {
+    background-color: #f0f0f0; /* Fondo suave al pasar el mouse */
+    color: #333; /* Cambiar el color del texto al pasar el mouse */
+}
+
+/* Estilo del texto dentro del ítem de autocompletado */
+.ui-menu-item a {
+    text-decoration: none; /* Sin subrayado en el texto */
+    color: inherit; /* Heredar el color del texto */
+}
+
+.regional-plan {
+    border: 2px solid #00b4ff; /* Borde azul para planes regionales */
+    position: relative; /* Para posicionar el título correctamente */
+    background-color: #f9f9f9; /* Fondo suave para mayor contraste */
+}
+
+.regional-title {
+    position: absolute; /* Posicionarlo sobre el plan */
+    top: -15px;
+    right: 160px;
+    background-color: #00b4ff; /* Fondo azul */
+    color: white; /* Texto blanco */
+    padding: 5px 10px; /* Espaciado interno */
+    border-radius: 5px; /* Bordes redondeados */
+    font-weight: bold; /* Negrita para el título */
+}
+
+.mobile-tooltip {
+    position: absolute;
+    background-color: #007bff62; /* Fondo azul */
+    color: white; /* Texto blanco */
+    padding: 5px 10px; /* Espaciado interno */
+    border-radius: 5px; /* Bordes redondeados */
+    z-index: 1000; /* Asegurarse de que esté encima de otros elementos */
+    opacity: 0;
+    transition: opacity 0.3s;
+}
