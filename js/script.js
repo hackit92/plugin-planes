@@ -1,166 +1,643 @@
-jQuery(document).ready(function($) {
-    // Lista de países y códigos
-    const countries = ep_ajax.countries; // Esto ahora es un objeto con nombres como claves y códigos como valores
-    const countryNames = Object.keys(countries); // Obtener solo los nombres de los países
+jQuery(document).ready(function ($) {
+    // Definir variables globales
+    let currentPage = 1;
+    let allPlans = []; // Almacenar todos los planes obtenidos
+    let selectedFilters = {
+        duration: null,
+        data: null,
+        planType: null
+    };
 
-    // Función para eliminar acentos
+    // Mapeo de países y códigos
+    const countries = ep_ajax.countries;
+    const uniqueCountries = {};
+    $.each(countries, function (name, code) {
+        if (!uniqueCountries[code]) uniqueCountries[code] = [];
+        uniqueCountries[code].push(name);
+    });
+
+    // Lista de Regiones con sus nombres en español
+    const regions = {
+        "Europa": "europa",
+        "Asia": "asia",
+        "Latinoamérica": "latinoamerica",
+        "Caribe": "caribe",
+        "Medio Oriente": "oriente-medio",
+        "Balcanes": "balcanes",
+        "Cáucaso": "caucaso"
+    };
+
+    // Manejar el clic en los botones de aplicar y restablecer filtros
+    $('#apply-filters').on('click', applyFilters);
+    $('#reset-filters').on('click', resetFilters);
+
+    // Funciones de utilidades
     function removeAccents(str) {
-        const accents = {
-            'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ã': 'a', 'å': 'a',
-            'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e',
-            'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i',
-            'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'õ': 'o',
-            'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u',
-            'ñ': 'n',
-            'ç': 'c',
-        };
-
-        return str.split('').map(char => accents[char] || char).join('');
+        return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
 
-    // Autocompletar para el campo de búsqueda
-    $('#mk-destination').autocomplete({
-        source: function(request, response) {
-            // Normalizar la entrada del usuario
-            const normalizedInput = removeAccents(request.term.toLowerCase());
+    function normalizeString(str) {
+        return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    }
 
-            // Filtrar países que coinciden con la entrada normalizada
-            const results = countryNames.filter(country => 
-                removeAccents(country.toLowerCase()).includes(normalizedInput)
-            );
+    function findCountryCodeByName(countryName) {
+        const normalizedInput = normalizeString(countryName);
+        let exactMatch = null;
+        let partialMatch = null;
 
-            // Crear un conjunto para evitar duplicados
-            const uniqueResults = [];
+        for (const [name, code] of Object.entries(countries)) {
+            const normalizedName = normalizeString(name);
+            if (normalizedName === normalizedInput) { // Coincidencia exacta
+                exactMatch = code;
+                break; // Prioridad a la coincidencia exacta
+            } else if (normalizedName.includes(normalizedInput)) { // Coincidencia parcial
+                partialMatch = code;
+            }
+        }
 
-            results.forEach(country => {
-                if (!uniqueResults.includes(country)) {
-                    uniqueResults.push(country); // Agregar la variante en español
+        return exactMatch || partialMatch || null;
+    }
+
+    function getCountrySuggestions(userInput) {
+        const normalizedInput = normalizeString(userInput);
+        const suggestions = [];
+
+        for (const [code, names] of Object.entries(uniqueCountries)) {
+            let bestMatchName = null;
+            let bestMatchScore = 0;
+
+            for (const name of names) {
+                const normalizedName = normalizeString(name);
+
+                // Verificar coincidencia
+                if (normalizedName.includes(normalizedInput)) {
+                    // Asignar mayor puntaje si la coincidencia es al inicio
+                    const score = normalizedName.startsWith(normalizedInput) ? 2 : 1;
+
+                    if (score > bestMatchScore) {
+                        bestMatchScore = score;
+                        bestMatchName = name;
+                    }
                 }
-            });
+            }
 
-            // Evitar que se incluya la versión en inglés
-            const englishVariants = countryNames.filter(country => 
-                countries[country] !== country && removeAccents(countries[country].toLowerCase()).includes(normalizedInput)
-            );
+            if (bestMatchName) {
+                suggestions.push({
+                    name: bestMatchName,
+                    code: code,
+                    matchScore: bestMatchScore
+                });
+            }
+        }
 
-            // Solo agregar la versión en inglés si no se ha agregado la versión en español
-            englishVariants.forEach(englishCountry => {
-                if (!uniqueResults.includes(englishCountry)) {
-                    uniqueResults.push(englishCountry);
+        // Ordenar las sugerencias por puntaje de coincidencia
+        suggestions.sort((a, b) => b.matchScore - a.matchScore);
+
+        return suggestions;
+    }
+
+    // Validar la lista de categorías de WooCommerce
+    if (!ep_ajax.wc_categories || !Array.isArray(ep_ajax.wc_categories)) {
+        return;
+    }
+
+    // Función para renderizar paginación
+    function renderPagination(totalPages) {
+        let paginationHTML = '';
+
+        if (totalPages > 1) {
+            paginationHTML += '<div class="pagination">';
+
+            // Botón "Anterior"
+            if (currentPage > 1) {
+                paginationHTML += `<span class="pagination-prev" data-page="${currentPage - 1}">&laquo; Anterior</span>`;
+            } else {
+                paginationHTML += `<span class="pagination-prev disabled">&laquo; Anterior</span>`;
+            }
+
+            // Números de página avanzados
+            const pageWindow = 2; // Número de páginas a mostrar a cada lado de la actual
+            const startPage = Math.max(1, currentPage - pageWindow);
+            const endPage = Math.min(totalPages, currentPage + pageWindow);
+
+            if (startPage > 1) {
+                paginationHTML += `<span class="pagination-page" data-page="1">1</span>`;
+                if (startPage > 2) {
+                    paginationHTML += `<span class="pagination-ellipsis">...</span>`;
                 }
-            });
+            }
 
-            response(uniqueResults);
-        },
-        minLength: 2, // Mínimo de caracteres para empezar la búsqueda
-        select: function(event, ui) {
-            const selectedCountry = ui.item.value; // Obtener el nombre del país seleccionado
-            $('#mk-destination').val(selectedCountry); // Rellenar el campo con el nombre del país
+            for (let i = startPage; i <= endPage; i++) {
+                if (i === currentPage) {
+                    paginationHTML += `<span class="pagination-page current">${i}</span>`;
+                } else {
+                    paginationHTML += `<span class="pagination-page" data-page="${i}">${i}</span>`;
+                }
+            }
 
-            // Buscar el código de país correspondiente
-            const countryCode = countries[selectedCountry];
-            $('#country_code').val(countryCode); // Guardar el código de país en un campo oculto
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    paginationHTML += `<span class="pagination-ellipsis">...</span>`;
+                }
+                paginationHTML += `<span class="pagination-page" data-page="${totalPages}">${totalPages}</span>`;
+            }
 
-            console.log("Código de país seleccionado: ", countryCode); // Depuración
-            event.preventDefault(); // Evitar que se dispare el evento de clic
+            // Botón "Siguiente"
+            if (currentPage < totalPages) {
+                paginationHTML += `<span class="pagination-next" data-page="${currentPage + 1}">Siguiente &raquo;</span>`;
+            } else {
+                paginationHTML += `<span class="pagination-next disabled">Siguiente &raquo;</span>`;
+            }
+
+            paginationHTML += '</div>';
+        }
+
+        $('#countries-pagination').html(paginationHTML);
+    }
+
+    // Paginación
+    const countriesPerPage = 30; // Número de países por página
+
+    // Función para cargar y mostrar la lista de países en orden alfabético
+    function loadCountries(page = 1) {
+        // Verificar si 'ep_ajax.wc_categories' está definido y es un array
+        if (!ep_ajax.wc_categories || !Array.isArray(ep_ajax.wc_categories)) {
+            return;
+        }
+
+        const availableCategories = ep_ajax.wc_categories.map(code => code.toLowerCase());
+
+        // Filtrar los países que tienen categorías disponibles
+        const filteredCountries = Object.entries(uniqueCountries).filter(([code, names]) => {
+            return availableCategories.includes(code.toLowerCase());
+        });
+
+        // Ordenar los países por nombre
+        const sortedFilteredCountries = filteredCountries.sort((a, b) => {
+            const countryNameA = a[1][0].toLowerCase();
+            const countryNameB = b[1][0].toLowerCase();
+            return countryNameA.localeCompare(countryNameB);
+        });
+
+        // Calcular el total de páginas
+        const totalCountries = sortedFilteredCountries.length;
+        const totalPages = Math.ceil(totalCountries / countriesPerPage);
+
+        // Asegurar que la página actual esté dentro de los límites
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+
+        currentPage = page; // Actualizar la página actual
+
+        // Obtener los países para la página actual
+        const startIndex = (currentPage - 1) * countriesPerPage;
+        const endIndex = startIndex + countriesPerPage;
+        const countriesToDisplay = sortedFilteredCountries.slice(startIndex, endIndex);
+
+        // Generar el HTML de los países para la página actual
+        let countryHTML = '';
+        countriesToDisplay.forEach(([code, names]) => {
+            const name = names[0];
+            countryHTML += `
+                <div class="country-item" data-country-code="${code}">
+                    <img src="${ep_ajax.icon_url}${code.toLowerCase()}.svg" alt="${name} flag" class="country-flag">
+                    <span class="country-name">${name}</span>
+                </div>
+            `;
+        });
+
+        // Insertar el HTML en el contenedor
+        $('#countries-list').html(countryHTML);
+
+        // Mostrar la paginación solo si la lista de países es visible y hay más de una página
+        if ($('#countries-list').hasClass('visible') && totalPages > 1) {
+            console.log('Mostrando paginación');
+            renderPagination(totalPages);
+            $('#countries-pagination').show();
+        } else {
+            console.log('Ocultando paginación');
+            $('#countries-pagination').hide();
+        }
+    }
+
+    // Función para cargar y mostrar la lista de regiones en español
+    function loadRegions() {
+        let regionHTML = '';
+        $.each(regions, function (regionName, regionSlug) {
+            regionHTML += `
+                <div class="region-item" data-region-slug="${regionSlug}">
+                    <img src="${ep_ajax.icon_url}${regionSlug}.svg" alt="${regionName} flag" class="country-flag">
+                    <span class="country-name">${regionName}</span>
+                </div>
+            `;
+        });
+
+        // Insertar el HTML en el contenedor de regiones
+        $('#regions-list').html(regionHTML);
+    }
+
+    // Inicializar las pestañas correctamente
+    $('.mk-tab.active').each(function () {
+        const target = $(this).data('tab-target');
+        $(target).addClass('visible').css({ maxHeight: 2500, opacity: 1 });
+    });
+
+    // Llamar a la función para cargar los países y regiones al iniciar
+    loadCountries();
+    loadRegions();
+
+    // Autocompletado del buscador de países
+    $('#mk-destination').on('input', function () {
+        const searchTerm = $(this).val();
+        $('#country-suggestions').empty().hide(); // Limpiar sugerencias previas
+
+        // Verificar si `searchTerm` es válido
+        if (searchTerm.length > 2) {
+            const suggestions = getCountrySuggestions(searchTerm);
+
+            // Verificar si hay sugerencias
+            if (suggestions && suggestions.length > 0) {
+                let suggestionsHTML = '';
+                suggestions.forEach(function(suggestion) {
+                    suggestionsHTML += `<div class="suggestion-item" data-country-code="${suggestion.code}">${suggestion.name}</div>`;
+                });
+
+                $('#country-suggestions').html(suggestionsHTML).show();
+
+                // Ajustar la posición del contenedor
+                const inputOffset = $('#mk-destination').offset();
+                $('#country-suggestions').css({
+                    position: 'absolute',
+                    width: $('#mk-destination').outerWidth(),
+                    zIndex: 1000,
+                    backgroundColor: '#fff',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                });
+            }
         }
     });
 
-    // Resto del código...
- function createPlanHTML(plan) {
-    // Verificar si categories existe y es un arreglo
-    const isRegional = Array.isArray(plan.categories) && plan.categories.length > 1;
+    // Manejar clic en una sugerencia
+    $(document).on('click', '.suggestion-item', function () {
+        const countryCode = $(this).data('country-code');
+        const countryName = $(this).text();
+        $('#mk-destination').val(countryName);
+        $('#country_code').val(countryCode);
+        $('#country-suggestions').empty().hide(); // Ocultar sugerencias
+        searchPlans(countryCode, false);
+    });
 
-    // Convertir las categorías a una cadena para mostrar en el tooltip
-    const categoriesList = isRegional ? plan.categories.join(', ') : '';
+    // Ocultar sugerencias al hacer clic fuera
+    $(document).on('click', function (e) {
+        if (!$(e.target).closest('#mk-destination, #country-suggestions').length) {
+            $('#country-suggestions').empty().hide();
+        }
+    });
 
-    return `
-        <div class="mk-plan ${isRegional ? 'regional-plan' : ''}" 
-             title="${isRegional ? 'Países incluidos: ' + categoriesList : ''}"> <!-- Tooltip aquí -->
-            ${isRegional ? '<div class="regional-title">Plan Regional</div>' : ''}
-            <div class="mk-network">
-                <img class="mk-flag" src="${plan.flag}" alt="Bandera de ${plan.name}" />
-                <span class="mk-pais">${plan.name}</span>
-                <img class="mk-connectivity-icon" src="${plan.connectivity === '5g' ? ep_ajax.icon_url + '5Gread.svg' : ep_ajax.icon_url + 'LTE.svg'}" alt="${plan.connectivity} Icono" />
-            </div>
-            <div class="mk-datos">
-                <span class="mk-data">${plan.data} GB</span>
-                <span class="mk-validity">${plan.validity} Días</span>
-            </div>
-            <div class="mk-precio">
-                <span class="mk-price">${plan.currency} ${plan.price}</span> <!-- Precio con el símbolo de la moneda -->
-            </div>
-            <div class="mk-boton">
-                <a href="${plan.buy_link}" class="mk-activate-button">Comprar</a>
-            </div>
-        </div>
-    `;
-}
+    // Manejar la tecla Enter en el campo de entrada
+    $('#mk-destination').on('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Evitar el comportamiento por defecto
+            const searchTerm = $(this).val();
+            const countryCode = findCountryCodeByName(searchTerm);
 
-//tooltip movil
+            if (countryCode) {
+                $('#country_code').val(countryCode);
+                $('#country-suggestions').empty().hide();
+                searchPlans(countryCode, false);
+            }
+        }
+    });
 
-// Añadir comportamiento para mostrar el tooltip en móviles
-$('.mk-plan').on('touchstart', function() {
-    const tooltipText = $(this).attr('title'); // Obtener el texto del tooltip
-    if (tooltipText) {
-        // Crear un elemento tooltip
-        const tooltip = $('<div class="mobile-tooltip"></div>').text(tooltipText);
-        $('body').append(tooltip);
+    // Lógica para cambiar de pestañas al hacer clic
+    $('.mk-tab').on('click', function () {
+        const target = $(this).data('tab-target');
+        $('.mk-tab').removeClass('active');
+        $(this).addClass('active'); // Activar la pestaña seleccionada
+        $('.filter-list').removeClass('visible').css({ maxHeight: 0, opacity: 0 });
+        $(target).addClass('visible').css({ maxHeight: 2500, opacity: 1 });
 
-        // Posicionar el tooltip cerca del elemento tocado
-        const offset = $(this).offset();
-        tooltip.css({
-            top: offset.top - tooltip.outerHeight() - 10, // 10px encima del elemento
-            left: offset.left + ($(this).outerWidth() / 2) - (tooltip.outerWidth() / 2) // Centrar
-        });
+        // Ocultar los resultados de planes si están visibles
+        $('#mk-plans-results').removeClass('visible').hide();
+        $('.mk-plans-header').hide();
 
-        // Mostrar el tooltip
-        tooltip.fadeIn();
+        // Mostrar u ocultar la paginación según la pestaña activa
+        if (target === '#countries-list') {
+            loadCountries(); // Cargar países y controlar la paginación
+        } else {
+            $('#countries-pagination').hide();
+        }
+    });
 
-        // Ocultar el tooltip al tocar otra parte de la pantalla
-        setTimeout(() => {
-            tooltip.fadeOut(() => {
-                tooltip.remove(); // Eliminar el tooltip del DOM
+    // Manejar clic en cada país
+    $(document).on('click', '.country-item', function () {
+        const countryCode = $(this).data('country-code');
+        $('#countries-list').removeClass('visible').css({ maxHeight: 0, opacity: 0 }); // Ocultar la lista de países
+        searchPlans(countryCode, false); // Buscar planes del país seleccionado
+        $('#mk-plans-results').show().addClass('visible');
+    });
+
+    // Manejar clic en cada región
+    $(document).on('click', '.region-item', function () {
+        const regionSlug = $(this).data('region-slug'); // Usar el slug de la región
+        $('#regions-list').removeClass('visible').css({ maxHeight: 0, opacity: 0 });
+        searchPlans(regionSlug, true); // Búsqueda parcial por slug de región
+        $('#mk-plans-results').show().addClass('visible');
+    });
+
+    // Manejar clic en los números de página
+    $(document).on('click', '.pagination-page', function () {
+        const page = parseInt($(this).data('page'));
+        if (!isNaN(page)) {
+            loadCountries(page);
+        }
+    });
+
+    // Manejar clic en "Anterior"
+    $(document).on('click', '.pagination-prev', function () {
+        if (!$(this).hasClass('disabled')) {
+            const page = parseInt($(this).data('page'));
+            if (!isNaN(page)) {
+                loadCountries(page);
+            }
+        }
+    });
+
+    // Manejar clic en "Siguiente"
+    $(document).on('click', '.pagination-next', function () {
+        if (!$(this).hasClass('disabled')) {
+            const page = parseInt($(this).data('page'));
+            if (!isNaN(page)) {
+                loadCountries(page);
+            }
+        }
+    });
+
+    // Evento para el botón de toggle de filtros
+    $('#filter-toggle-button').on('click', function() {
+        $(this).toggleClass('active');
+        $('#mk-filters').toggleClass('active');
+    });
+
+    // Función para aplicar los filtros
+    function applyFilters() {
+        if (!allPlans || allPlans.length === 0) {
+            console.log("No hay planes disponibles para filtrar.");
+            console.log(allPlans);
+            return;
+        }
+
+        let filteredPlans = allPlans.slice(); // Copiar el array de planes original
+
+        // Filtrar por Duración
+        if (selectedFilters.duration) {
+            filteredPlans = filteredPlans.filter(plan => {
+                return parseInt(plan.validity) === parseInt(selectedFilters.duration);
             });
-        }, 3000); // Ocultar después de 3 segundos
+        }
+
+        // Filtrar por Datos
+        if (selectedFilters.data) {
+            filteredPlans = filteredPlans.filter(plan => {
+                return parseInt(plan.data) === parseInt(selectedFilters.data);
+            });
+        }
+
+        // Filtrar por Tipo de Plan
+        if (selectedFilters.planType) {
+            filteredPlans = filteredPlans.filter(plan => plan.coverage_type === selectedFilters.planType);
+        }
+
+        // Mostrar los planes filtrados en consola (para depuración)
+        console.log("Planes filtrados:", filteredPlans);
+
+        // Actualizar la visualización de los planes
+        renderPlans(filteredPlans);
     }
-});
 
+    // Función para restablecer los filtros
+    function resetFilters() {
+        // Restablecer valores seleccionados
+        selectedFilters = { duration: null, data: null, planType: null };
 
-// resto de la función
-    $('.mk-search-button').on('click', function() {
-        const countryCode = $('#country_code').val(); // Usar el código de país correspondiente
+        // Eliminar clase 'active' de todas las pestañas
+        $('.filter-tab').removeClass('active');
 
-        console.log("Código de país seleccionado: ", countryCode); // Depuración
+        console.log('Filtros restablecidos:', selectedFilters);
 
-        if (countryCode) {
-            $('#mk-plans-results').empty().append('<p>Cargando...</p>'); // Mensaje de carga
+        // Restablecer los planes a la lista completa
+        renderPlans(allPlans);
+    }
+
+    // Manejar eventos de clic en los botones de filtros con funcionalidad de toggle
+    $('.filter-tabs').on('click', function (e) {
+        if ($(e.target).hasClass('filter-tab')) {
+            const group = $(this);
+            const clickedTab = $(e.target);
+            const filterType = group.attr('id').replace('filter-', ''); // 'duration', 'data', 'planType'
+            const filterValue = clickedTab.data('value');
+
+            if (clickedTab.hasClass('active')) {
+                // Si el botón ya está activo, desactivarlo y eliminar el filtro
+                clickedTab.removeClass('active');
+                selectedFilters[filterType] = null;
+            } else {
+                // Si el botón no está activo, activarlo y desactivar otros en el grupo
+                group.find('.filter-tab').removeClass('active');
+                clickedTab.addClass('active');
+                selectedFilters[filterType] = filterValue;
+            }
+
+            console.log('Filtros seleccionados:', selectedFilters);
+
+            // Aplicar los filtros cada vez que se selecciona o deselecciona un valor
+            applyFilters();
+        }
+    });
+
+    // Manejar clic en el botón "Comprar"
+    $(document).on('click', '.mk-activate-button', function () {
+        const productId = $(this).data('product-id');
+        const checkoutUrl = `${ep_ajax.checkout_url}?add-to-cart=${productId}`;
+        window.location.href = checkoutUrl;
+    });
+
+    // Evento para mostrar/ocultar la cobertura en planes regionales
+    $(document).on('click', '.region-title', function() {
+        $(this).siblings('.mk-coverage').toggleClass('visible');
+    });
+
+    // Función para buscar planes (adaptada para aceptar país o región)
+    function searchPlans(searchTerm, isRegion = false) {
+        if (searchTerm) {
+            const $plansResults = $('#mk-plans-results');
+            const $plansHeader = $('.mk-plans-header');
+
+            // Ocultar listas de países y regiones
+            $('#countries-list').removeClass('visible').css({ maxHeight: 0, opacity: 0 });
+            $('#regions-list').removeClass('visible').css({ maxHeight: 0, opacity: 0 });
+
+            // Ocultar la paginación al mostrar los planes
+            $('#countries-pagination').hide();
+
+            // Mostrar mensaje de carga y ocultar resultados previos
+            $plansResults.empty().append('<p>' + ep_ajax.cargando + '</p>');
+            $plansHeader.hide();
+            $plansResults.removeClass('visible').css('opacity', '0');
+
+            // Datos que se envían a la búsqueda
+            const searchData = {
+                action: 'ep_search_plans',
+                nonce: ep_ajax.nonce,
+                region_slug: isRegion ? searchTerm : null, // Enviar region_slug si es región
+                country_code: !isRegion ? searchTerm : null, // Enviar country_code si no es región
+                // Agregar el tipo de plan si está seleccionado
+                plan_type: selectedFilters.planType ? selectedFilters.planType : null
+            };
+
+            // Eliminar los campos que sean null para evitar conflictos
+            if (searchData.region_slug === null) delete searchData.region_slug;
+            if (searchData.country_code === null) delete searchData.country_code;
+            if (searchData.plan_type === null) delete searchData.plan_type;
 
             $.ajax({
                 url: ep_ajax.ajax_url,
                 method: 'POST',
-                data: {
-                    action: 'ep_search_plans',
-                    country_code: countryCode // Buscar usando el código ISO3
-                },
-                success: function(data) {
-                    $('#mk-plans-results').empty(); // Limpiar resultados anteriores
-                    if (data.length > 0) {
-                        $('.mk-plans-header').show(); // Mostrar encabezado de mejores planes
-                        data.forEach(function(plan) {
-                            $('#mk-plans-results').append(createPlanHTML(plan));
-                        });
+                data: searchData,
+                success: function (data) {
+                    $plansResults.empty();
+                    if (data.success && data.data.length > 0) {
+                        allPlans = data.data; // Guardar todos los planes obtenidos
+                        // Mostrar los filtros
+                        $('#mk-filters').show();
+                        $plansHeader.show();
+                        renderPlans(allPlans); // Renderizar los planes
+                        // Ocultar el autocompletado al mostrar los planes
+                        $('#country-suggestions').empty().hide();
                     } else {
-                        $('#mk-plans-results').append('<p>No se encontraron planes.</p>');
-                        $('.mk-plans-header').hide(); // Ocultar encabezado si no hay resultados
+                        // Si no se encuentran planes, mostrar mensaje y ocultar filtros
+                        $plansResults.append('<p>' + ep_ajax.no_planes + '</p>');
+                        $plansHeader.hide();
+                        $('#mk-filters').hide();
                     }
                 },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    alert('Error en la búsqueda de planes: ' + textStatus);
+                error: function (jqXHR, textStatus, errorThrown) {
+                    $plansResults.html('<p>' + ep_ajax.error + '</p>');
                 }
             });
-        } else {
-            alert('Por favor, ingresa un país válido.');
         }
-    });
+    }
+
+    // Función para renderizar los planes
+    function renderPlans(plans) {
+        const $plansResults = $('#mk-plans-results');
+        $plansResults.empty();
+
+        if (plans.length > 0) {
+            // Ordenar los planes por tipo y luego por precio
+            function getPlanTypeOrder(plan) {
+                if (plan.coverage_type === 'local') {
+                    return 1; // Local
+                } else if (plan.coverage_type === 'region') {
+                    return 2; // Regional
+                } else if (plan.coverage_type === 'global') {
+                    return 3; // Global
+                } else {
+                    return 4; // Otros
+                }
+            }
+
+            plans.sort(function (a, b) {
+                var typeOrderA = getPlanTypeOrder(a);
+                var typeOrderB = getPlanTypeOrder(b);
+
+                if (typeOrderA !== typeOrderB) {
+                    return typeOrderA - typeOrderB; // Ordenar por tipo
+                } else {
+                    var priceA = parseFloat(a.price.toString().replace(/[^0-9.]/g, ''));
+                    var priceB = parseFloat(b.price.toString().replace(/[^0-9.]/g, ''));
+                    return priceA - priceB; // Ordenar por precio si el tipo es el mismo
+                }
+            });
+
+            plans.forEach(function (plan) {
+                $plansResults.append(createPlanHTML(plan));
+                console.log(plan);
+            });
+            showPlans();
+        } else {
+            // Si no se encuentran planes, mostrar mensaje
+            $plansResults.append('<p>' + ep_ajax.no_planes + '</p>');
+        }
+    }
+
+    // Función para crear el HTML de cada plan
+    function createPlanHTML(plan) {
+        // Aseguramos que los valores estén normalizados
+        const connectivity5G = plan.connectivity_5g ? plan.connectivity_5g.toLowerCase().trim() : 'no';
+        const connectivityLTE = plan.connectivity_lte ? plan.connectivity_lte.toLowerCase().trim() : 'no';
+
+        // Determinar qué icono de conectividad mostrar
+        let connectivityIcon = '';
+        if (connectivity5G === 'yes') {
+            connectivityIcon = ep_ajax.icon_url + '5Gread.svg';
+        } else if (connectivityLTE === 'yes') {
+            connectivityIcon = ep_ajax.icon_url + 'LTE.svg';
+        } else {
+            connectivityIcon = ep_ajax.icon_url + 'unknown.svg'; // Opcional: icono por defecto
+        }
+
+        // Asegurar que los valores sean números
+        plan.data = parseInt(plan.data);
+        plan.validity = parseInt(plan.validity);
+
+        // Agregar clase según el tipo de plan
+        let planTypeClass = '';
+        if (plan.coverage_type === 'region') {
+            planTypeClass = 'region-plan';
+        } else if (plan.coverage_type === 'global') {
+            planTypeClass = 'global-plan';
+        }
+
+        // Crear el HTML del plan
+        return `
+            <div class="mk-plan ${planTypeClass}">
+                ${plan.coverage_type === 'region' ? `
+                    <div class="region-title">
+                        ${ep_ajax.plan_region}
+                        <img src="${ep_ajax.icon_url}dropdown-icon.svg" alt="Desplegar" class="region-icon" />
+                    </div>
+                ` : ''}
+                <div class="mk-network">
+                    <img class="mk-flag" src="${plan.flag}" alt="${ep_ajax.bandera_de} ${plan.name}" />
+                    <span class="mk-pais">${plan.name}</span>
+                    ${connectivityIcon ? `<img class="mk-connectivity-icon" src="${connectivityIcon}" alt="Conectividad" />` : ''}
+                </div>
+                <div class="mk-datos">
+                    <span class="mk-data">${plan.data} GB</span>
+                    <span class="mk-divider">|</span>
+                    <span class="mk-validity">${plan.validity} ${ep_ajax.dias}</span>
+                </div>
+                <div class="mk-precio">
+                    <span class="mk-price">${plan.price} ${plan.currency}</span>
+                </div>
+                <div class="mk-boton">
+                    <button class="mk-activate-button" data-product-id="${plan.product_id}">${ep_ajax.comprar}</button>
+                </div>
+                ${plan.coverage_type === 'region' ? `<div class="mk-coverage">${ep_ajax.paises_incluidos} ${plan.coverage || ''}</div>` : ''}
+            </div>
+        `;
+    }
+
+    // Función para mostrar los planes con transición
+    function showPlans() {
+        $('#mk-plans-results').addClass('visible').css({
+            display: 'flex',
+            opacity: '1',
+            transform: 'translateY(0)'
+        });
+    }
 });
